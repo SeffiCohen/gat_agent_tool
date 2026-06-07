@@ -1,0 +1,35 @@
+# =============================================================================
+# Trained GAT weights ARE tracked in this release repo — do NOT ignore GAT/ or *.pt
+# The whole point of this repository is to ship the learned checkpoints. Never add
+# a rule that excludes GAT/ or *.pt below.
+# =============================================================================
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+.env
+
+# OS / editor cruft
+.DS_Store
+._*
+
+# Data (patient rows must never be committed)
+*.parquet
+Data/
+
+# ruvector / local stores
+ruvector.db
+*.rvf
+*.rvf.lock
+
+# Logs
+*.log

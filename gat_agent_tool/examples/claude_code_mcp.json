@@ -1,0 +1,23 @@
+{
+  "_comment": "Drop this into the 'mcpServers' block of your Claude Code settings (~/.claude/settings.json or per-project .mcp.json). Then mention @gat-scorer in your chat and Claude Code will call into it.",
+  "mcpServers": {
+    "gat-scorer": {
+      "command": "gat-agent-mcp",
+      "args": ["--checkpoint", "/absolute/path/to/your/gat_model.pt"],
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      }
+    },
+
+    "_comment_multi": "To run multiple GATs side-by-side (one per disease, for instance), add more entries under different keys. Claude Code namespaces tools by server name, so tool calls stay unambiguous:",
+
+    "gat-scorer-ra": {
+      "command": "gat-agent-mcp",
+      "args": ["--checkpoint", "/path/to/ra_gat.pt", "--server_name", "gat-scorer-ra"]
+    },
+    "gat-scorer-t1d": {
+      "command": "gat-agent-mcp",
+      "args": ["--checkpoint", "/path/to/t1d_gat.pt", "--server_name", "gat-scorer-t1d"]
+    }
+  }
+}

@@ -1,0 +1,7 @@
+# Slim convenience pins mirroring the gat_agent_tool package core dependencies.
+# Optional extras (mcp, hf, openai, real-auc) install via:
+#     pip install -e gat_agent_tool[all]
+numpy>=1.23
+pandas>=1.5
+torch>=2.0
+torch-geometric>=2.3

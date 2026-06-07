@@ -1,0 +1,19 @@
+{
+  "_comment": "Paste into `claude_desktop_config.json` (typically at ~/Library/Application Support/Claude/ on macOS). Claude Desktop auto-reloads on config change, but you may need to restart.",
+  "mcpServers": {
+    "gat-scorer": {
+      "command": "gat-agent-mcp",
+      "args": ["--checkpoint", "/absolute/path/to/your/gat_model.pt"]
+    },
+
+    "_comment_venv": "If `gat-agent-mcp` isn't on your system PATH (e.g. you installed it in a conda env), point `command` at the env's python instead:",
+
+    "gat-scorer-venv": {
+      "command": "/opt/homebrew/Caskroom/miniconda/base/envs/bd_paper/bin/python",
+      "args": [
+        "-m", "gat_agent_tool.mcp_server",
+        "--checkpoint", "/absolute/path/to/your/gat_model.pt"
+      ]
+    }
+  }
+}

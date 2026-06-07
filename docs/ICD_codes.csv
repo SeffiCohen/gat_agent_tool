@@ -1,0 +1,62 @@
+Disease name,ICD-9 codes,,,,,
+Type I diabetes (including complications),"250.x1, 250.x3 where x = 0 to 9
+Include 4-digit (250.x) codes (outpatient; use textual descriptions)
+
+Expanded list of codes:
+250.01
+250.03
+250.11
+250.13
+250.21
+250.23
+250.31
+250.33
+250.41
+250.43
+250.51
+250.53
+250.61
+250.63
+250.71
+250.73
+250.81
+250.83
+250.91
+250.93",,,,,
+"Lupus erythematosus (DLE, SLE)","695.4
+710.0",,,,,
+Crohn’s disease,"555.0 Regional enteritis of small intestine
+555.1 Regional enteritis of large intestine
+555.2 Regional enteritis of small intestine with large intestine
+555.9 Regional enteritis of unspecified site",,,,,
+Ulcerative colitis,"556.0 Ulcerative (chronic) enterocolitis
+556.1 Ulcerative (chronic) ileocolitis
+556.2 Ulcerative (chronic) proctitis
+556.3 Ulcerative (chronic) proctosigmoiditis
+556.4 Pseudopolyposis of colon
+556.5 Left-sided ulcerative (chronic) colitis
+556.6 Universal ulcerative (chronic) colitis
+556.8 Other ulcerative colitis
+556.9 Ulcerative colitis, unspecified",,,,,
+Rheumatoid arthritis & other inflammatory polyarthropathies,"All codes under 714 and 714.x
+
+Expanded list of codes:
+714.0
+714.1
+714.2
+714.8
+714.81
+714.89
+714.9",,,,,
+Multiple sclerosis,340,,,,,
+Familial Mediterranean fever,"277.31
+Include 4-digit codes (e.g., outpatient; use textual descriptions)",,,,,
+Graves' disease,"242.0
+242.00
+242.01",,,,,
+Scleroderma,710.1,,,,,
+Celiac disease,579.0,,,,,
+Hashimoto thyroiditis,245.2,,,,,
+Psoriasis,"696.0 Psoriatic arthropathy
+696.1 Other psoriasis",,,,,
+Sjögren's syndrome / Sicca syndrome,710.2,,,,,

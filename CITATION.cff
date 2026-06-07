@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+title: "Distilling private EHR evidence into a public agentic tool for CBC biomarker discovery"
+message: "If you use this software or the released GAT model, please cite the accompanying paper as well as this software record."
+type: software
+version: 0.1.0
+date-released: 2026-04-29
+license: Apache-2.0
+url: "https://github.com/[ORG]/gat-agent-tool"  # placeholder; replace at acceptance
+repository-code: "https://github.com/[ORG]/gat-agent-tool"  # placeholder
+keywords:
+  - biomarker discovery
+  - graph attention network
+  - symbolic regression
+  - large language model
+  - privacy-preserving deployment
+  - clinical decision support
+  - learning to rank
+authors:
+  - family-names: "[Author One]"
+    given-names: "[First]"
+    affiliation: "[Department / Institution placeholder]"
+    orcid: "https://orcid.org/0000-0000-0000-0000"  # placeholder
+preferred-citation:
+  type: article
+  title: "Distilling private EHR evidence into a public agentic tool for CBC biomarker discovery"
+  authors:
+    - family-names: "[Author One]"
+      given-names: "[First]"
+  year: 2026
+  journal: "npj Digital Medicine"
+  doi: "10.0000/0000000000"  # placeholder; fill at acceptance
+references:
+  - type: article
+    title: "TRIPOD+AI statement: updated guidance for reporting clinical prediction models that use regression or machine learning methods"
+    authors:
+      - family-names: "Collins"
+        given-names: "Gary S."
+    year: 2024
+    journal: "BMJ"
+    volume: 385
+    issue: e078378

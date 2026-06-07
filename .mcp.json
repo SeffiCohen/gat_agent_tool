@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "gat-multi-scorer": {
+      "command": "gat-agent-multi-mcp",
+      "args": [
+        "--gat-root", "GAT",
+        "--checkpoint-filename", "best_by_loss.pt",
+        "--server_name", "gat-multi-scorer",
+        "--device", "auto",
+        "--log_level", "INFO"
+      ],
+      "env": {
+        "GAT_AGENT_TOOL_CODE_DIR": "Code"
+      }
+    }
+  }
+}
