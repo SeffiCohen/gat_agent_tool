@@ -256,24 +256,3 @@ currently stand.
 
 If you redistribute or build on this work, retain the corresponding notices for each
 component.
-
----
-
-## Citation
-
-If you use this tool or the released checkpoints, please cite the companion paper. A
-machine-readable record is provided in [`CITATION.cff`](CITATION.cff).
-
-```bibtex
-@article{gatagenttool,
-  title   = {Distilling private {EHR} evidence into a public agentic tool
-             for {CBC} biomarker discovery},
-  author  = {[Author list — see CITATION.cff]},
-  journal = {[Journal — to be finalized at acceptance]},
-  year    = {2026},
-  note    = {DOI: <DOI-PLACEHOLDER — to be assigned on archival/acceptance>}
-}
-```
-
-Repository and archival identifiers (e.g. a code-hosting URL and a Zenodo DOI) are
-intentionally left as **placeholders** here and will be filled in at release.
