@@ -361,5 +361,6 @@ running these skills inherit that non-commercial restriction.
 Third-party tool names referenced in comparison tables are trademarks of their respective
 owners; no affiliation or endorsement is implied.
 
-If you use these skills, please cite the companion paper via
-[`CITATION.cff`](../CITATION.cff).
+If you use these skills, please cite the companion paper:
+
+> **Distilling private EHR evidence into a public agentic tool for CBC biomarker discovery.**

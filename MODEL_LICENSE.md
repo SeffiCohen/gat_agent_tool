@@ -52,5 +52,3 @@ separate written permission from the authors.
 If you use these trained GAT checkpoints, please cite the companion paper:
 
 > **Distilling private EHR evidence into a public agentic tool for CBC biomarker discovery.**
-
-See `CITATION.cff` for the machine-readable citation record.
