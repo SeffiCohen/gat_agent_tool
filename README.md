@@ -38,7 +38,11 @@ runtime. Higher predicted AUC is better; scores are direction-agnostic and clamp
 gat-agent-tool/
 ├── Code/                          GAT model + graph-encoding code the package imports
 │   ├── gat_model.py               EfficientGAT / AdvancedGAT / TreeAwareGAT class definitions
-│   └── expr_graph_utils.py        expression-string → PyG graph (string_to_data_obj, parser)
+│   ├── expr_graph_utils.py        expression-string → PyG graph (string_to_data_obj, parser)
+│   └── _external_scoring.py       expression evaluation + direction-agnostic AUC helpers
+├── skills/                        optional Claude Code agent skills (see skills/README.md)
+│   ├── biomarker-discovery/       literature-grounded propose–score–refine search loop
+│   └── biomarker-explainer/       Shapley attribution + literature-concordance reporting
 ├── gat_agent_tool/                installable Python package (core scorer + registry + drivers)
 │   ├── pyproject.toml             package metadata and console scripts
 │   ├── gat_agent_tool/            package source (core.py, registry.py, MCP servers, drivers)
@@ -221,6 +225,42 @@ To register the server globally instead of per-project, copy the same `gat-multi
 block into the `"mcpServers"` map of `~/.claude/settings.json` (Claude Code) or
 `~/Library/Application Support/Claude/claude_desktop_config.json` (Claude Desktop on
 macOS), using an absolute `--gat-root` path.
+
+---
+
+## Agent skills
+
+The scorer answers one question — *how promising is this expression?* Two optional
+[Claude Code](https://claude.com/claude-code) skills in [`skills/`](skills/) wrap it into the
+research loops described in the paper:
+
+- **`biomarker-discovery`** — a literature-grounded **propose → score → refine** loop. Claude
+  proposes batches of CBC expressions, the released scorer ranks them by predicted AUC, and the
+  loop refines until the predicted score plateaus. The measured AUC is logged but never shown to
+  the proposing model, so the search tests the distilled prior alone.
+- **`biomarker-explainer`** — explains one expression: exact Shapley attribution of every
+  blood-count feature, a glass-box figure, and a literature review classifying each component
+  *Expected* / *Surprising* with verified citations, packaged as a one-page report.
+
+```bash
+pip install -e gat_agent_tool[all]      # scorer + MCP server
+pip install -r requirements.txt         # adds scikit-learn, asteval, matplotlib
+
+mkdir -p .claude/skills                 # Claude Code discovers skills here
+ln -s "$PWD/skills/biomarker-discovery" .claude/skills/
+ln -s "$PWD/skills/biomarker-explainer" .claude/skills/
+```
+
+Launch Claude Code from the repository root (so `.mcp.json`'s relative paths resolve), then invoke
+`/biomarker-discovery` or `/biomarker-explainer`.
+
+**What is not included.** No patient data ships here. Scoring an expression needs nothing beyond
+this clone, but every step that measures a *real* AUC — bootstrap CIs and all Shapley attribution —
+requires a labelled cohort **you** supply (MIMIC-IV, EHRShot and NHANES are obtained under their own
+data use agreements). The paper's head-to-head against third-party LLM-tool expressions is not
+reproducible here, as those candidate sets are not redistributable. See
+[`skills/README.md`](skills/README.md) for the full capability matrix, the required parquet schema,
+and the limitations.
 
 ---
 

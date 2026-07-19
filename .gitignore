@@ -22,9 +22,14 @@ venv/
 .DS_Store
 ._*
 
-# Data (patient rows must never be committed)
+# Skill outputs (generated locally)
+Results/
+
+# Data (patient rows must never be committed).
+# Anchored to the repo root so it cannot swallow nested data/ dirs on
+# case-insensitive filesystems (e.g. skills/biomarker-explainer/data/).
 *.parquet
-Data/
+/Data/
 
 # ruvector / local stores
 ruvector.db

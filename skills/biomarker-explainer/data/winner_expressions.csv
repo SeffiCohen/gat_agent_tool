@@ -1,0 +1,14 @@
+disease_folder,disease_name,winner_expression
+242,Hyperthyroidism,(lab_MCH_last * lab_HB_last + lab_HCT_last - lab_RDW_last) * (lab_HB_last + lab_MCV_last * lab_MCHC_last)
+250,Type1Diabetes,(lab_WBC_last + lab_RDW_last + lab_EOS_pct_last) / (lab_LYMpct_last + lab_HB_last + lab_HCT_last)
+277,FamilialMediterraneanFever,lab_RDW_last * lab_NEUTpct_last * (lab_RDW_last + lab_RDW_last) / (lab_MCV_last - lab_RDW_last)
+340,MultipleSclerosis,lab_HB_last * lab_RBC_last + lab_LYMpct_last - lab_NEUTpct_last
+555,CrohnsDisease,(lab_PLT_last * lab_RDW_last + lab_NEUTpct_last * lab_RDW_last) / (lab_LYMpct_last * lab_HB_last + lab_LYMpct_last)
+556,UlcerativeColitis,(lab_PLT_last * lab_RDW_last - lab_LYMpct_last * lab_HB_last) * (lab_RDW_last * (lab_RDW_last + lab_RDW_last + lab_NEUTpct_last)) / (lab_LYMpct_last * lab_HB_last - lab_MONOpct_last)
+696,Psoriasis,(lab_LYMpct_last + lab_RDW_last + lab_RDW_last) / (lab_HB_last * lab_HCT_last * lab_MCV_last * lab_NEUTpct_last * (lab_BASO_pct_last + lab_EOS_pct_last))
+714,RheumatoidArthritis,(lab_RDW_last - lab_RBC_last) * (lab_MCV_last + lab_RDW_last - lab_MCH_last) / (lab_HB_last * lab_MCHC_last - lab_RDW_last)
+2452,HashimotoThyroiditis,(lab_HB_last * lab_HB_last * lab_RBC_last) / (lab_LYMpct_last * lab_PLT_last + lab_HCT_last)
+5790,CeliacDisease,(lab_RBC_last - lab_RDW_last) / (lab_RBC_last + lab_RDW_last)
+7100,SystemicLupusErythematosus,((lab_RBC_last + lab_WBC_last) * lab_HB_last) / (lab_RDW_last + lab_NEUTpct_last + lab_MONOpct_last)
+7101,SystemicSclerosis,((lab_RDW_last * lab_MCV_last) - lab_HB_last * lab_MCH_last) / (lab_HB_last * lab_MCHC_last) * lab_RDW_last
+7102,SjogrensSyndrome,lab_RDW_last * lab_MCV_last - lab_HB_last * (lab_HCT_last + lab_RBC_last)
