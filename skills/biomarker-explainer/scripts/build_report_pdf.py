@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import re
 import shutil
 import subprocess
 import sys
@@ -120,6 +121,36 @@ def split_title(md: str):
     return None, md
 
 
+def page_count(pdf):
+    """Page count via pdfinfo, else by counting page objects. None if neither works."""
+    if shutil.which("pdfinfo"):
+        p = subprocess.run(["pdfinfo", str(pdf)], capture_output=True, text=True)
+        m = re.search(r"^Pages:\s*(\d+)", p.stdout, flags=re.M)
+        if m:
+            return int(m.group(1))
+    try:
+        blob = Path(pdf).read_bytes()
+    except OSError:
+        return None
+    n = len(re.findall(rb"/Type\s*/Page[^s]", blob))
+    return n or None
+
+
+def compact_references(body: str, size: str = "footnotesize") -> str:
+    """Set the reference list in a smaller face.
+
+    A complete citation (all authors, full title, journal, volume, pages) is several
+    times longer than a truncated one, which pushes the longer reports onto a second
+    page. Shrinking the reference block keeps every citation intact and the report on
+    one page -- the alternative, cutting titles or authors, is what made the references
+    wrong in the first place."""
+    m = re.search(r"^#{1,6}\s*References\s*$", body, flags=re.M)
+    if not m:
+        return body
+    head, refs = body[:m.end()], body[m.end():].rstrip()
+    return f"{head}\n\n\\begingroup\\{size}\n{refs}\n\n\\endgroup\n"
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--md", required=True, help="the synthesised report markdown")
@@ -132,6 +163,11 @@ def main():
     ap.add_argument("--figwidth", type=int, default=38, help="figure width as %% of text width")
     ap.add_argument("--margin", type=float, default=0.75, help="page margin in inches")
     ap.add_argument("--fontsize", type=int, default=9, help="body font size in pt")
+    ap.add_argument("--refs-size", default="footnotesize",
+                    choices=["normalsize", "small", "footnotesize", "scriptsize"],
+                    help="type size for the reference list (keeps long lists on one page)")
+    ap.add_argument("--no-fit-one-page", dest="fit_one_page", action="store_false",
+                    help="do not retry with tighter typography when the report spills past one page")
     ap.add_argument("--engine", default="pdflatex", choices=["pdflatex", "xelatex", "lualatex"])
     args = ap.parse_args()
 
@@ -160,53 +196,79 @@ def main():
                "circle = expected, star = surprising).")
         fig_block = f"\n\n![{cap}]({figabs}){{width={args.figwidth}%}}\n\n"
 
-    body = sanitize(body)
-    combined = body if not fig_block else (fig_block + body)
-
     today = _dt.date.today().isoformat()
-    meta = ["---",
-            f'title: "{title}"',
-            f'subtitle: "{args.subtitle}  ({today})"',
-            f"geometry: margin={args.margin}in",
-            "colorlinks: true", "linkcolor: RoyalBlue", "urlcolor: RoyalBlue",
-            f"fontsize: {args.fontsize}pt",
-            "header-includes: |",
-            "  \\usepackage{titling}",
-            "  \\setlength{\\droptitle}{-4em}",
-            "  \\setlength{\\parskip}{2pt}",
-            "  \\setlength{\\parindent}{0pt}",
-            "  \\posttitle{\\par\\end{center}\\vskip 0.3em}",
-            "---", ""]
-    src = "\n".join(meta) + combined
-
-    with tempfile.NamedTemporaryFile("w", suffix=".md", dir=str(outdir), delete=False) as tf:
-        tf.write(src)
-        tmp_md = tf.name
-
     tex_out = outdir / f"{args.stem}_explained.tex"
     pdf_out = outdir / f"{args.stem}_explained.pdf"
     common = ["-f", "markdown", "--resource-path", str(Path(args.figure).resolve().parent) if args.figure else "."]
-    build = Path(tempfile.mkdtemp(prefix="brp_"))
-    try:
-        # 1) standalone .tex (pandoc's engine-adaptive iftex preamble compiles anywhere)
-        subprocess.run(["pandoc", tmp_md, *common, "-s", "-t", "latex", "-o", str(tex_out)], check=True)
-        # 2) compile that .tex to PDF ourselves; latexmk handles the hyperref reruns.
-        eng = args.engine
-        if shutil.which("latexmk"):
-            flag = {"pdflatex": "-pdf", "xelatex": "-xelatex", "lualatex": "-lualatex"}[eng]
-            subprocess.run(["latexmk", flag, "-interaction=nonstopmode", "-halt-on-error",
-                            f"-output-directory={build}", str(tex_out)], check=True, stdout=subprocess.DEVNULL)
-        else:
-            for _ in range(2):
-                subprocess.run([eng, "-interaction=nonstopmode", "-halt-on-error",
+
+    def compose(refs_size, figwidth):
+        combined = compact_references(sanitize(body), refs_size)
+        if fig_block:
+            combined = fig_block.replace(f"width={args.figwidth}%", f"width={figwidth}%") + combined
+        meta = ["---",
+                f'title: "{title}"',
+                f'subtitle: "{args.subtitle}  ({today})"',
+                f"geometry: margin={args.margin}in",
+                "colorlinks: true", "linkcolor: RoyalBlue", "urlcolor: RoyalBlue",
+                f"fontsize: {args.fontsize}pt",
+                "header-includes: |",
+                "  \\usepackage{titling}",
+                "  \\usepackage{enumitem}",
+                "  \\setlist{nosep,leftmargin=1.3em}",
+                "  \\setlength{\\droptitle}{-4em}",
+                "  \\setlength{\\parskip}{2pt}",
+                "  \\setlength{\\parindent}{0pt}",
+                "  \\posttitle{\\par\\end{center}\\vskip 0.3em}",
+                "---", ""]
+        return "\n".join(meta) + combined
+
+    def render(src):
+        """pandoc -> standalone .tex -> PDF. Returns the page count."""
+        with tempfile.NamedTemporaryFile("w", suffix=".md", dir=str(outdir), delete=False) as tf:
+            tf.write(src)
+            tmp_md = tf.name
+        build = Path(tempfile.mkdtemp(prefix="brp_"))
+        try:
+            # 1) standalone .tex (pandoc's engine-adaptive iftex preamble compiles anywhere)
+            subprocess.run(["pandoc", tmp_md, *common, "-s", "-t", "latex", "-o", str(tex_out)], check=True)
+            # 2) compile that .tex to PDF ourselves; latexmk handles the hyperref reruns.
+            eng = args.engine
+            if shutil.which("latexmk"):
+                flag = {"pdflatex": "-pdf", "xelatex": "-xelatex", "lualatex": "-lualatex"}[eng]
+                subprocess.run(["latexmk", flag, "-interaction=nonstopmode", "-halt-on-error",
                                 f"-output-directory={build}", str(tex_out)], check=True, stdout=subprocess.DEVNULL)
-        shutil.move(str(build / f"{tex_out.stem}.pdf"), str(pdf_out))
-    finally:
-        Path(tmp_md).unlink(missing_ok=True)
-        shutil.rmtree(build, ignore_errors=True)
+            else:
+                for _ in range(2):
+                    subprocess.run([eng, "-interaction=nonstopmode", "-halt-on-error",
+                                    f"-output-directory={build}", str(tex_out)], check=True, stdout=subprocess.DEVNULL)
+            shutil.move(str(build / f"{tex_out.stem}.pdf"), str(pdf_out))
+        finally:
+            Path(tmp_md).unlink(missing_ok=True)
+            shutil.rmtree(build, ignore_errors=True)
+        return page_count(pdf_out)
+
+    # A complete reference list is long; rather than cut citations to fit, tighten the
+    # typography step by step and stop as soon as the report lands on a single page.
+    attempts = [(args.refs_size, args.figwidth)]
+    if args.fit_one_page:
+        sizes = ["footnotesize", "scriptsize"]
+        tail = sizes[sizes.index(args.refs_size) + 1:] if args.refs_size in sizes else sizes
+        attempts += [(s, args.figwidth) for s in tail]
+        attempts += [(tail[-1] if tail else args.refs_size, max(24, args.figwidth - 6))]
+
+    for i, (rs, fw) in enumerate(attempts):
+        pages = render(compose(rs, fw))
+        if pages is None or pages <= 1:
+            break
+        if i + 1 < len(attempts):
+            print(f"[{args.stem}] {pages} pages at refs={rs}, fig={fw}% — retrying tighter",
+                  file=sys.stderr)
+        else:
+            print(f"[{args.stem}] WARNING: still {pages} pages after all compaction attempts",
+                  file=sys.stderr)
 
     print(f"wrote {tex_out}")
-    print(f"wrote {pdf_out}  (engine={eng})")
+    print(f"wrote {pdf_out}  (engine={args.engine})")
 
 
 if __name__ == "__main__":

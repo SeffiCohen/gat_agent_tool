@@ -37,6 +37,9 @@ SHAP = SCRIPTS / "shap_biomarker.py"
 PDF = SCRIPTS / "build_report_pdf.py"
 SINGLE_WF = SCRIPTS / "deep_litreview.workflow.js"
 
+sys.path.insert(0, str(SCRIPTS))
+from citations import format_reference, load_records  # noqa: E402
+
 # clinically-grouped order (matches the candJ panel); 277/FMF excluded (no MIMIC cases)
 DEFAULT_ICDS = ["7100", "714", "2452", "242", "696", "7102", "7101", "556", "555", "340", "250", "5790"]
 
@@ -111,26 +114,15 @@ def _first_sentence(txt, maxlen=210):
     return s
 
 
-def _first_author(cite, authmap):
-    pmid = cite.get("pmid") or ""
-    auth = authmap.get(pmid) or cite.get("authors") or ""
-    if auth:
-        first = auth.split(",")[0].strip().split(" ")[0]
-    else:
-        first = (cite.get("title") or "Ref").split(" ")[0]
-    return first
-
-
-def build_concise_report(disease, icd, expr, auc, components):
+def build_concise_report(disease, icd, expr, auc, components, pubmed=None):
     """Deterministic one-page explainer from the verified, cached findings:
-    formula + <=2 sentences per component (direction + verdict + mechanism) + numbered refs."""
+    formula + <=2 sentences per component (direction + verdict + mechanism) + numbered refs.
+
+    References are rendered from the PubMed cache (see citations.py), never reconstructed
+    from the workflow's own citation dicts -- those carry the PMID and the author string on
+    different objects, so any attempt to join them silently loses the authors."""
+    pubmed = load_records() if pubmed is None else pubmed
     refs, ref_idx = [], {}   # pmid -> number
-    # global pmid -> authors (verified_citations drop the author list; research.citations keep it)
-    gauth = {}
-    for c in components:
-        for x in ((c.get("research") or {}).get("citations") or []):
-            if x.get("pmid") and x.get("authors"):
-                gauth[x["pmid"]] = x["authors"]
 
     def cite_num(cite):
         key = cite.get("pmid") or cite.get("doi") or cite.get("title")
@@ -161,7 +153,6 @@ def build_concise_report(disease, icd, expr, auc, components):
         else:
             s1 += "."
         s2 = _first_sentence(research.get("mechanism") or research.get("rationale") or "", maxlen=112)
-        authmap = {x.get("pmid"): x.get("authors") for x in (research.get("citations") or []) if x.get("pmid")}
         vcs = [x for x in (verify.get("verified_citations") or []) if x.get("exists") and x.get("supports_claim")]
         cites = vcs or (research.get("citations") or [])
         tag = f" [{cite_num(cites[0])}]" if cites else " (no verified citation)"
@@ -175,20 +166,28 @@ def build_concise_report(disease, icd, expr, auc, components):
     lines.append("")
     lines.append("## References")
     for i, cite in enumerate(refs, 1):
-        auth = _first_author(cite, gauth)
-        title = (cite.get("title") or "").strip().rstrip(".")
-        if len(title) > 70:
-            title = title[:67].rstrip(",;: ") + "..."
-        yr = cite.get("year") or ""
-        pmid = cite.get("pmid") or ""
-        doi = cite.get("doi") or ""
-        tail = f"PMID {pmid}" if pmid else (doi or "")
-        lines.append(f"{i}. {auth} et al. {title}. {yr}. {tail}.")
+        pmid = (cite.get("pmid") or "").strip()
+        rec = pubmed.get(pmid)
+        if rec:
+            lines.append(f"{i}. {format_reference(rec)}")
+            continue
+        # Unresolved: print what the workflow actually gave us and say so, rather than
+        # dressing an unverified citation up as a complete reference.
+        print(f"WARNING: no PubMed record for {pmid or '(no PMID)'} "
+              f"-- {(cite.get('title') or '?')[:60]}", file=sys.stderr)
+        bits = [b for b in [(cite.get("title") or "").strip().rstrip("."),
+                            str(cite.get("year") or "").strip(),
+                            f"PMID {pmid}" if pmid else (cite.get("doi") or "")] if b]
+        lines.append(f"{i}. {'. '.join(bits)}. [unverified]")
     return "\n".join(lines)
 
 
-def best_citation(comp):
-    """Return a short 'Title (Year, PMID)' from the first VERIFIED citation, else ''."""
+def best_citation(comp, pubmed=None):
+    """A compact 'Author et al., Journal Vol, pages (Year). PMID n' for the summary table.
+
+    Resolved from the PubMed cache like the full reference lists, so the CSV and the
+    one-pagers name the same paper the same way."""
+    pubmed = load_records() if pubmed is None else pubmed
     vr = (comp.get("verify") or {}).get("verified_citations") or []
     vr = [c for c in vr if c.get("exists") and c.get("supports_claim")]
     cand = vr[0] if vr else None
@@ -197,16 +196,14 @@ def best_citation(comp):
         cand = rc[0] if rc else None
     if not cand:
         return ""
+    rec = pubmed.get((cand.get("pmid") or "").strip())
+    if rec:
+        return format_reference(rec, max_authors=1).replace("**", "")
     title = (cand.get("title") or "").strip().rstrip(".")
-    if len(title) > 60:
-        title = title[:57] + "..."
-    yr = cand.get("year") or ""
-    pmid = cand.get("pmid") or cand.get("doi") or ""
-    tail = ", ".join(str(x) for x in (yr, f"PMID {pmid}" if cand.get("pmid") else pmid) if x)
-    return f"{title} ({tail})" if tail else title
+    return f"{title} ({cand.get('year', '')}) [unverified]".strip()
 
 
-def finalize(workflow_output, repo):
+def finalize(workflow_output, repo, reuse_figures=False):
     res = json.load(open(workflow_output))
     results = res.get("results") if isinstance(res, dict) else res
     if results is None:
@@ -216,6 +213,12 @@ def finalize(workflow_output, repo):
     if af.exists():
         for b in json.load(open(af)).get("biomarkers", []):
             findings_by_icd[b["icd"]] = b
+
+    pubmed = load_records()
+    if not pubmed:
+        print("WARNING: no PubMed record cache -- references will render as [unverified].\n"
+              "         Run: python fetch_pubmed_records.py --workflow-output "
+              f"{workflow_output}", file=sys.stderr)
 
     summary_rows, pdfs, done, skipped = [], {}, [], []
     for r in results:
@@ -230,7 +233,7 @@ def finalize(workflow_output, repo):
         auc = r.get("whole_auc_mimic", findings_by_icd.get(icd, {}).get("whole_auc_mimic", ""))
         # 1) concise one-page report, deterministically assembled from the verified findings
         (out / f"{icd}_explained.md").write_text(
-            build_concise_report(disease, icd, expr, auc, r.get("components") or []))
+            build_concise_report(disease, icd, expr, auc, r.get("components") or [], pubmed))
         # 2) verdict annotations + per-feature summary rows
         annot = {}
         comps = r.get("components") or []
@@ -248,13 +251,14 @@ def finalize(workflow_output, repo):
                 "rel_impact": fm.get("rel_impact", c.get("rel_impact", "")),
                 "verdict": verdict or "",
                 "confidence": (c.get("verify") or {}).get("confidence", ""),
-                "key_citation": best_citation(c),
+                "key_citation": best_citation(c, pubmed),
             })
         json.dump(annot, open(out / "annot.json", "w"), indent=2)
         # 3) annotated figure (re-render with verdict markers)
-        subprocess.run([sys.executable, str(SHAP), "--icd", icd, "--outdir", str(out),
-                        "--annotate", str(out / "annot.json")],
-                       capture_output=True, text=True)
+        if not reuse_figures:
+            subprocess.run([sys.executable, str(SHAP), "--icd", icd, "--outdir", str(out),
+                            "--annotate", str(out / "annot.json")],
+                           capture_output=True, text=True)
         fig = out / f"{icd}_shap_tree_annotated.png"
         if not fig.exists():
             fig = out / f"{icd}_shap_tree.png"
@@ -338,12 +342,15 @@ def main():
     p.add_argument("--icds", nargs="*", default=DEFAULT_ICDS)
     f = sub.add_parser("finalize")
     f.add_argument("--workflow-output", required=True)
+    f.add_argument("--reuse-figures", action="store_true",
+                   help="keep the existing annotated figures instead of re-rendering them "
+                        "(lets reports be rebuilt without access to the patient cohort)")
     args = ap.parse_args()
     repo = find_repo()
     if args.cmd == "prep":
         prep(args.icds, repo)
     else:
-        finalize(Path(args.workflow_output), repo)
+        finalize(Path(args.workflow_output), repo, reuse_figures=args.reuse_figures)
 
 
 if __name__ == "__main__":

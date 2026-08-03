@@ -166,10 +166,37 @@ Workflow({ scriptPath: ".../scripts/deep_litreview_all.workflow.js",
 #    Results/_aggregate/biomarker_explainer/workflow_result.json   (the .output file nests it under `result`).
 ```
 ```bash
-# 3) finalize: per-disease MD + annotated figure + PDF, then a merged compendium + summary CSV
+# 3) resolve every cited PMID against PubMed  ← REQUIRED before finalize
+python skills/biomarker-explainer/scripts/fetch_pubmed_records.py \
+    --workflow-output Results/_aggregate/biomarker_explainer/workflow_result.json \
+    --bib Results/_aggregate/biomarker_explainer/biomarker_explainer_refs.bib
+#    → data/pubmed_records.json (the cache every reference is rendered from) + a BibTeX file.
+#    Any PMID it cannot resolve, and anything retracted, is printed — chase those before shipping.
+
+# 4) finalize: per-disease MD + annotated figure + PDF, then a merged compendium + summary CSV
 python skills/biomarker-explainer/scripts/run_all_biomarkers.py \
     finalize --workflow-output Results/_aggregate/biomarker_explainer/workflow_result.json
+#    add --reuse-figures to rebuild the reports without re-running SHAP (no cohort access needed)
+
+# 5) OPTIONAL: one unified LaTeX source for the whole supplement, instead of merged PDFs
+python skills/biomarker-explainer/scripts/build_supplement_tex.py \
+    --workflow-output Results/_aggregate/biomarker_explainer/workflow_result.json \
+    --outdir <dir> --compile
 ```
+
+Step 4 merges independently compiled per-disease PDFs with `pdfunite`, so there is no single
+editable source for the compendium. Step 5 builds one: a standalone article with a page per
+disease, relative figure paths, and a single shared bibliography driven by `\cite` keys that
+`citations.assign_keys` also uses for the `.bib`, so a key can never drift between a citation and
+the entry it points at. Use it when the supplement has to be edited by hand or uploaded to
+Overleaf; the merged-PDF path remains fine when it does not.
+
+**Never render a reference from the workflow's own citation dicts.** The research pass returns an
+author string but usually no PMID, while the verification pass returns the PMID but no authors, so
+joining them on PMID silently produces authorless entries — and any renderer that then falls back to
+the title's first word emits fabrications like "Hematologic et al.". Step 3 exists to make that
+impossible: `citations.py` renders both the reference lists and the BibTeX from the PubMed cache, and
+anything missing from it is marked `[unverified]` rather than guessed.
 
 Batch outputs land in `Results/_aggregate/biomarker_explainer/`: `all_biomarkers_explained.pdf` (cover +
 all per-disease reports), `expected_surprising_summary.csv` (every component's verdict + key citation),
