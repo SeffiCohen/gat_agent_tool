@@ -18,6 +18,22 @@ const icd = A.icd || ''
 const exprP = A.expression_pretty || A.expression_raw || ''
 const wholeAuc = A.whole_auc_mimic
 const features = A.features || []
+
+// Cohort provenance, written by shap_biomarker.py as
+// "<validation> (out-of-sample vs <discovery> discovery cohort)". Naming the real cohorts keeps
+// the caveat truthful when the skill runs on data other than this project's.
+const cohortM = /^\s*([^(]+?)\s*\(\s*out-of-sample vs\s+(.+?)\s+discovery cohort\s*\)\s*$/i
+  .exec(A.cohort || '')
+const validationCohort = cohortM ? cohortM[1].trim() : (A.cohort || '').trim()
+const discoveryCohort = cohortM ? cohortM[2].trim() : ''
+const caveatLine = 'Caveats: '
+  + (validationCohort
+      ? 'the logistic link is fit on ' + validationCohort + ' (in-sample)'
+      : 'the logistic link is fit in-sample on the cohort it explains')
+  + (discoveryCohort ? '; the expression was discovered on ' + discoveryCohort : '')
+  + '; age confounds several red-cell indices'
+  + (wholeAuc ? '; the out-of-sample AUC is modest (~' + wholeAuc + ')' : '')
+  + '; a feature recurring in numerator+denominator may be an overfit artifact rather than biology.'
 if (!features.length) {
   return { error: 'no args.features — run shap_biomarker.py first and pass its findings.json' }
 }
@@ -203,7 +219,7 @@ const synthPrompt = [
   '',
   'Then ONE short paragraph per feature (ordered by |rel_impact|, largest first). Each paragraph is AT MOST TWO sentences: begin with the bold feature name and its role, e.g. "**RDW** (numerator+denominator).", say whether higher levels raise or lower the predicted risk and give the Expected / Surprising / Unclear verdict with confidence, then the one-line mechanism, and end with a single bracketed citation number like [1]. Never exceed two sentences for a feature.',
   '',
-  'End with one italic line: *Caveats: the logistic link is fit on MIMIC (in-sample); the expression was discovered on Clalit; age confounds several CBC features; out-of-sample AUC is modest (~' + (wholeAuc || '?') + '); a feature recurring in numerator+denominator may be an overfit artifact.*',
+  'End with this exact italic line, reproduced verbatim: *' + caveatLine + '*',
   '',
   '## References',
   'A numbered list of ONLY the citations you referenced by [n] (First-author et al. Short title. Year. PMID). One key reference per feature is enough.',

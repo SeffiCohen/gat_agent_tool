@@ -33,7 +33,8 @@ sys.path.insert(0, str(SCRIPTS))
 
 from build_report_pdf import sanitize  # noqa: E402
 from citations import assign_keys, load_records, write_bib  # noqa: E402
-from run_all_biomarkers import _ESTPHRASE, _first_sentence, DEFAULT_ICDS, find_repo  # noqa: E402
+from run_all_biomarkers import (_ESTPHRASE, _first_sentence, caveat_line,  # noqa: E402
+                                DEFAULT_ICDS, find_repo)
 
 _TEX_SPECIAL = [("\\", r"\textbackslash{}"), ("&", r"\&"), ("%", r"\%"), ("$", r"\$"),
                 ("#", r"\#"), ("_", r"\_"), ("{", r"\{"), ("}", r"\}"),
@@ -165,6 +166,23 @@ def main():
     if not pubmed:
         sys.exit("no PubMed record cache; run fetch_pubmed_records.py first")
 
+    # Real cohort provenance per disease, so the caveat names the cohorts actually used rather
+    # than asserting this project's. shap_biomarker.py records it in each findings.json.
+    cohorts = {}
+    agg = repo / "Results" / "_aggregate" / "biomarker_explainer" / "all_findings.json"
+    if agg.exists():
+        for b in json.loads(agg.read_text()).get("biomarkers", []):
+            if b.get("cohort"):
+                cohorts[str(b.get("icd"))] = b["cohort"]
+    for icd in order:
+        if icd in cohorts:
+            continue
+        f = repo / "Results" / icd / "biomarker_explainer" / f"{icd}_findings.json"
+        if f.exists():
+            cohorts[icd] = json.loads(f.read_text()).get("cohort")
+    if not cohorts:
+        print("no cohort provenance found; caveats will use neutral wording", file=sys.stderr)
+
     # Only cited records go in the bibliography, so no uncited entry can appear.
     cited = []
     for icd in order:
@@ -208,10 +226,7 @@ def main():
             role = tex(c.get("role", ""))
             body.append(f"\\textbf{{{tex(pretty)}}} ({role}). {s1} {s2}{cite}\\par")
         body.append(r"\vspace{2pt}")
-        body.append(rf"{{\footnotesize\emph{{Caveats: the logistic link is fit on MIMIC (in-sample); "
-                    rf"the expression was discovered on Clalit; age confounds several red-cell indices; "
-                    rf"the out-of-sample AUC is modest ($\approx${tex(auc)}); and a feature recurring in "
-                    rf"numerator+denominator may be an overfit artifact rather than biology.}}\par}}")
+        body.append(rf"{{\footnotesize\emph{{{tex(caveat_line(auc, cohorts.get(icd)))}}}\par}}")
         body.append(r"\clearpage")
 
     bst = Path(args.bst) if args.bst else None

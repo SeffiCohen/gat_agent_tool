@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -103,6 +104,41 @@ _ESTPHRASE = {
     "unknown": "of unclear direction in",
 }
 
+# shap_biomarker.py writes provenance as "<validation> (out-of-sample vs <discovery> discovery cohort)"
+_COHORT_RE = re.compile(
+    r"^\s*(?P<validation>[^(]+?)\s*\(\s*out-of-sample vs\s+(?P<discovery>.+?)\s+discovery cohort\s*\)\s*$",
+    re.I)
+
+
+def caveat_line(auc, cohort=None):
+    """The honesty caveat that closes every explainer, built from the run's own provenance.
+
+    The cohort names were previously hardcoded to this project's (fit on MIMIC, discovered on
+    Clalit), so the released skill asserted that provenance for anyone running it on their own
+    data. A confidently wrong caveat is worse than none, because the caveat is the guardrail.
+    shap_biomarker.py already records the real cohorts in findings.json; this reads them and
+    falls back to neutral wording when they are unavailable.
+
+    Returns plain text with a literal U+2248; LaTeX callers pass it through their sanitiser,
+    which maps that to \\ensuremath{\\approx}."""
+    validation, discovery = None, None
+    if cohort:
+        m = _COHORT_RE.match(str(cohort))
+        if m:
+            validation, discovery = m.group("validation").strip(), m.group("discovery").strip()
+        else:
+            validation = str(cohort).strip()
+    bits = [f"the logistic link is fit on {validation} (in-sample)" if validation
+            else "the logistic link is fit in-sample on the cohort it explains"]
+    if discovery:
+        bits.append(f"the expression was discovered on {discovery}")
+    bits.append("age confounds several red-cell indices")
+    if auc not in (None, ""):
+        bits.append(f"the out-of-sample AUC is modest (≈{auc})")
+    bits.append("a feature recurring in numerator+denominator may be an overfit artifact "
+                "rather than biology")
+    return "Caveats: " + "; ".join(bits) + "."
+
 
 _ABBREV = {"e.g.", "i.e.", "vs.", "cf.", "ca.", "etc.", "approx.", "fig.", "no.", "ref.",
            "dr.", "prof.", "et al."}
@@ -133,7 +169,7 @@ def _first_sentence(txt):
     return txt
 
 
-def build_concise_report(disease, icd, expr, auc, components, pubmed=None):
+def build_concise_report(disease, icd, expr, auc, components, pubmed=None, cohort=None):
     """Deterministic one-page explainer from the verified, cached findings:
     formula + <=2 sentences per component (direction + verdict + mechanism) + numbered refs.
 
@@ -178,10 +214,7 @@ def build_concise_report(disease, icd, expr, auc, components, pubmed=None):
         line = f"**{pretty}** ({role}). {s1} {s2}{tag}".replace("  ", " ")
         lines.append(line)
         lines.append("")
-    lines.append(f"*Caveats: the logistic link is fit on MIMIC (in-sample); the expression was discovered on "
-                 f"Clalit; age confounds several red-cell indices; the out-of-sample AUC is modest "
-                 f"(≈{auc}); and a feature recurring in numerator+denominator may be an overfit "
-                 f"artifact rather than biology.*")
+    lines.append(f"*{caveat_line(auc, cohort)}*")
     lines.append("")
     lines.append("## References")
     for i, cite in enumerate(refs, 1):
@@ -252,7 +285,8 @@ def finalize(workflow_output, repo, reuse_figures=False):
         auc = r.get("whole_auc_mimic", findings_by_icd.get(icd, {}).get("whole_auc_mimic", ""))
         # 1) concise one-page report, deterministically assembled from the verified findings
         (out / f"{icd}_explained.md").write_text(
-            build_concise_report(disease, icd, expr, auc, r.get("components") or [], pubmed))
+            build_concise_report(disease, icd, expr, auc, r.get("components") or [], pubmed,
+                                 findings_by_icd.get(icd, {}).get("cohort")))
         # 2) verdict annotations + per-feature summary rows
         annot = {}
         comps = r.get("components") or []
