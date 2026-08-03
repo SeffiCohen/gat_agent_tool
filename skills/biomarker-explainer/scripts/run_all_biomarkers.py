@@ -104,14 +104,33 @@ _ESTPHRASE = {
 }
 
 
-def _first_sentence(txt, maxlen=210):
+_ABBREV = {"e.g.", "i.e.", "vs.", "cf.", "ca.", "etc.", "approx.", "fig.", "no.", "ref.",
+           "dr.", "prof.", "et al."}
+
+
+def _first_sentence(txt):
+    """The complete first sentence of `txt`, never cut mid-clause.
+
+    Earlier versions clipped to a character budget and appended an ellipsis, which left
+    explanations ending in "present in..." or "driven by...". A clause that stops mid-thought
+    is worse than a long one, so the whole sentence is returned and layout is handled by the
+    caller (the report builders shrink type or give each disease its own page)."""
     import re
-    txt = (txt or "").strip()
-    parts = re.split(r"(?<=[.!?])\s+", txt)
-    s = (parts[0] if parts else txt).strip()
-    if len(s) > maxlen:
-        s = s[:maxlen].rsplit(" ", 1)[0].rstrip(",;: ") + "..."
-    return s
+    txt = " ".join((txt or "").split())
+    if not txt:
+        return ""
+    for m in re.finditer(r"[.!?](?=\s)", txt):
+        head = txt[:m.end()]
+        tail = txt[m.end():].lstrip()
+        last = head.rsplit(" ", 1)[-1].lower()
+        # don't break on "e.g." / "vs." / an initial ("T.") / a decimal ("0.5")
+        if last in _ABBREV or re.search(r"(?:^|\s)[A-Za-z]\.$", head) or re.search(r"\d\.$", head):
+            continue
+        # a real sentence boundary is followed by a capital or a digit
+        if tail and not (tail[0].isupper() or tail[0].isdigit()):
+            continue
+        return head
+    return txt
 
 
 def build_concise_report(disease, icd, expr, auc, components, pubmed=None):
@@ -152,7 +171,7 @@ def build_concise_report(disease, icd, expr, auc, components, pubmed=None):
             s1 += f" ({conf} confidence)."
         else:
             s1 += "."
-        s2 = _first_sentence(research.get("mechanism") or research.get("rationale") or "", maxlen=112)
+        s2 = _first_sentence(research.get("mechanism") or research.get("rationale") or "")
         vcs = [x for x in (verify.get("verified_citations") or []) if x.get("exists") and x.get("supports_claim")]
         cites = vcs or (research.get("citations") or [])
         tag = f" [{cite_num(cites[0])}]" if cites else " (no verified citation)"

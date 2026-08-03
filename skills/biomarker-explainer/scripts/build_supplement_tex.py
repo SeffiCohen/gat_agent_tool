@@ -22,6 +22,7 @@ import argparse
 import json
 import re
 import shutil
+import struct
 import subprocess
 import sys
 from pathlib import Path
@@ -68,8 +69,35 @@ def component_sentences(c, disease):
         s1 = (f"Higher {tex(pretty)} {rdir} the predicted risk --- \\textbf{{unclear}}, as the "
               f"literature on {tex(pretty)} in {tex(disease)} is limited")
     s1 += f" ({tex(conf)} confidence)." if conf else "."
-    s2 = tex(_first_sentence(research.get("mechanism") or research.get("rationale") or "", maxlen=112))
+    s2 = tex(_first_sentence(research.get("mechanism") or research.get("rationale") or ""))
     return pretty, s1, s2
+
+
+def png_size(path):
+    """(width, height) from the PNG IHDR chunk. Avoids a Pillow dependency."""
+    with open(path, "rb") as f:
+        head = f.read(24)
+    if head[:8] != b"\x89PNG\r\n\x1a\n":
+        return None
+    return struct.unpack(">II", head[16:24])
+
+
+def figure_width(path, default=0.62):
+    """Text-width fraction for an expression-tree figure, chosen from its aspect ratio.
+
+    The trees vary from taller-than-wide (a two-feature expression) to very wide (an
+    eight-feature one). A single fraction squeezes the wide ones until their chip labels are
+    unreadable while leaving most of the page empty, so wide figures are allowed more of the
+    line. Tall figures keep the original fraction -- they are already legible, and growing
+    them would crowd the text on component-heavy pages."""
+    size = png_size(path)
+    if not size or not size[1]:
+        return default
+    ratio = size[0] / size[1]
+    for threshold, frac in ((2.4, 1.00), (1.8, 0.88), (1.3, 0.75)):
+        if ratio >= threshold:
+            return frac
+    return default
 
 
 def first_pmid(c):
@@ -164,7 +192,8 @@ def main():
         body.append(f"\\addcontentsline{{toc}}{{section}}{{{tex(disease)} ({tex(icd)})}}")
         if src.exists():
             body.append(r"\begin{center}")
-            body.append(f"\\includegraphics[width=0.62\\textwidth]{{figures_onepagers/{icd}.png}}")
+            body.append(f"\\includegraphics[width={figure_width(src):.2f}\\textwidth]"
+                        f"{{figures_onepagers/{icd}.png}}")
             body.append(r"\end{center}")
             body.append(r"{\footnotesize Each blood-test leaf is coloured by its Shapley impact on the "
                         r"disease prediction (red = raises risk, blue = lowers it; triangle = direction; "
