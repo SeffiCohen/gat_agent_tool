@@ -1,3 +1,4 @@
+📄 Paper / Preprint: [Distilling private EHR evidence into a public agentic tool for CBC biomarker discovery](https://arxiv.org/abs/2610.04749)
 # gat-agent-tool — a privacy-preserving Graph-Attention scorer for CBC biomarker discovery
 
 `gat-agent-tool` releases a trained **Graph Attention Network (GAT)** that ranks candidate
